@@ -29,6 +29,13 @@ public class Preferences
      *  Requires restart to take effect. */
     @Preference public static boolean progressbar_scale_mode;
 
+    /** When {@code true}, the Thermometer widget is rendered via {@link org.csstudio.javafx.rtplot.RTTank}
+     *  as its rendering engine, which adds a numeric scale, tick format/precision,
+     *  an optional second scale, and alarm-limit lines.
+     *  When {@code false} (default), the stock hand-drawn thermometer look is preserved.
+     *  Requires restart to take effect. */
+    @Preference public static boolean thermometer_scale_mode;
+
     static
     {
     	AnnotatedPreferences.initialize(Preferences.class, "/display_representation_preferences.properties");

@@ -60,6 +60,7 @@ import org.csstudio.display.builder.model.properties.RulesWidgetProperty;
 import org.csstudio.display.builder.model.properties.ScriptsWidgetProperty;
 import org.csstudio.display.builder.model.properties.WidgetClassProperty;
 import org.csstudio.display.builder.model.widgets.ProgressBarWidget;
+import org.csstudio.display.builder.model.widgets.ThermometerWidget;
 import org.csstudio.display.builder.representation.Preferences;
 import org.csstudio.display.builder.representation.javafx.FilenameSupport;
 import org.phoebus.ui.color.NamedWidgetColor;
@@ -171,6 +172,14 @@ public class PropertyPanelSection extends GridPane {
             if (!Preferences.progressbar_scale_mode
                     && property.getWidget() instanceof ProgressBarWidget
                     && ProgressBarWidget.SCALE_MODE_PROPS.contains(property.getName()))
+                continue;
+
+            // When using the legacy hand-drawn Thermometer rendering, hide properties
+            // that only affect the RTTank-based scale rendering — they have no effect
+            // and would only confuse operators.
+            if (!Preferences.thermometer_scale_mode
+                    && property.getWidget() instanceof ThermometerWidget
+                    && ThermometerWidget.SCALE_MODE_PROPS.contains(property.getName()))
                 continue;
 
             // Start of new category that needs to be shown?
