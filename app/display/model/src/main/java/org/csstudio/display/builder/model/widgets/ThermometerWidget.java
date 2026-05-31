@@ -72,9 +72,11 @@ public class ThermometerWidget extends ScaledPVWidget
         newIntegerPropertyDescriptor(WidgetPropertyCategory.DISPLAY, "inner_padding",
                                      Messages.WidgetProperties_InnerPadding, 0, 20);
 
-    /** 'bulb_size' — radius in pixels of the circular bulb drawn at the bottom of the
-     *  thermometer tube in RTTank scale mode.  Set to 0 to suppress the bulb entirely.
-     *  Default 20 matches the auto-size of the stock thermometer for a 40 px wide widget. */
+    /** 'bulb_size' — extra diameter in pixels added to the tube width to size the bulb
+     *  ({@code bulbDiameter = tubeWidth + bulb_size}), in RTTank scale mode.  Clamped
+     *  to a minimum visible ring so the bulb is always present; 0 gives the narrowest
+     *  allowed bulb, not no bulb.  Default 20: with a standard 40 px wide widget the
+     *  resulting bulb diameter is ~40 px, matching the stock thermometer proportions. */
     public static final WidgetPropertyDescriptor<Integer> propBulbSize =
         newIntegerPropertyDescriptor(WidgetPropertyCategory.DISPLAY, "bulb_size",
                                      Messages.WidgetProperties_BulbSize, 0, 50);

@@ -122,19 +122,14 @@ public class RTTank extends Canvas
     /** Immutable thermometer geometry, computed once by
      *  {@link #computeThermoLayout} and reused by {@link #drawThermometer}
      *  so the scale, tube, bulb and liquid always share one coordinate frame. */
-    private static final class ThermoGeom
-    {
-        final double cx, halfTube, tubeW, xL, xR, tubeTop, yj, bulbCy, bulbR, bulbD;
-        ThermoGeom(final double cx, final double halfTube, final double tubeW,
-                   final double xL, final double xR, final double tubeTop,
-                   final double yj, final double bulbCy, final double bulbR,
-                   final double bulbD)
-        {
-            this.cx = cx; this.halfTube = halfTube; this.tubeW = tubeW;
-            this.xL = xL; this.xR = xR; this.tubeTop = tubeTop; this.yj = yj;
-            this.bulbCy = bulbCy; this.bulbR = bulbR; this.bulbD = bulbD;
-        }
-    }
+    private record ThermoGeom(
+        double cx, double halfTube, double tubeW,
+        double xL, double xR, double tubeTop,
+        double yj, double bulbCy, double bulbR, double bulbD) {}
+
+    /** Measurement result from {@link #measureThermoScales}: pixel widths of
+     *  each visible scale and the shared top/bottom label-overflow gaps. */
+    private record ScaleMeasure(int leftW, int rightW, int topGap, int botGap) {}
 
     /** Cached thermometer geometry from the most recent {@link #computeThermoLayout}. */
     private volatile ThermoGeom thermo_geom = null;
@@ -883,8 +878,9 @@ public class RTTank extends Canvas
         final int ip  = inner_padding;
         final int gap = 3;                 // pixels between scale labels and tube
 
-        final int[] sc = measureThermoScales(gc, bounds);
-        final int leftScaleW = sc[0], rightScaleW = sc[1], topGap = sc[2], botGap = sc[3];
+        final ScaleMeasure sc = measureThermoScales(gc, bounds);
+        final int leftScaleW = sc.leftW(), rightScaleW = sc.rightW();
+        final int topGap = sc.topGap(), botGap = sc.botGap();
 
         // Vertical extent of the usable area (label overflow reserved via gaps).
         final double top    = bounds.y + ip + topGap + 1.0;
@@ -936,9 +932,8 @@ public class RTTank extends Canvas
     }
 
     /** Measure the visible scales' widths and shared vertical label gaps.
-     *  @return {@code { leftScaleWidth, rightScaleWidth, topGap, bottomGap }}
-     *          in pixels (a width of 0 means that scale is hidden). */
-    private int[] measureThermoScales(final Graphics2D gc, final Rectangle bounds)
+     *  @return pixel widths and top/bottom label-overflow gaps for the two scales */
+    private ScaleMeasure measureThermoScales(final Graphics2D gc, final Rectangle bounds)
     {
         int leftW = 0, rightW = 0, topGap = 0, botGap = 0;
         if (scale_visible)
@@ -955,7 +950,7 @@ public class RTTank extends Canvas
             botGap = Math.max(botGap, gaps[0]);
             topGap = Math.max(topGap, gaps[1]);
         }
-        return new int[] { leftW, rightW, topGap, botGap };
+        return new ScaleMeasure(leftW, rightW, topGap, botGap);
     }
 
     /** Place each visible scale flush against its tube wall, spanning only the

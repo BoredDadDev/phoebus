@@ -108,6 +108,8 @@ public class RTThermometerRepresentation extends RTScaledWidgetRepresentation<Th
         tank.setFont(JFXUtil.convert(model_widget.propFont().getValue()));
         tank.setFillColor(JFXUtil.convert(model_widget.propFillColor().getValue()));
         tank.setBackground(JFXUtil.convert(model_widget.propBackgroundColor().getValue()));
+        // Empty (unfilled) tube area uses the background color so it blends into the
+        // widget background; the liquid fill_color provides the only visible contrast.
         tank.setEmptyColor(JFXUtil.convert(model_widget.propBackgroundColor().getValue()));
         tank.setScaleVisible(model_widget.propScaleVisible().getValue());
         tank.setShowMinorTicks(model_widget.propShowMinorTicks().getValue());
