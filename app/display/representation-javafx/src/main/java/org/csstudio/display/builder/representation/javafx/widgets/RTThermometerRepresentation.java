@@ -7,78 +7,123 @@
  *******************************************************************************/
 package org.csstudio.display.builder.representation.javafx.widgets;
 
+import java.awt.Rectangle;
+
 import org.csstudio.display.builder.model.widgets.ThermometerWidget;
 import org.csstudio.display.builder.representation.javafx.JFXUtil;
 
+import javafx.application.Platform;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.shape.ArcTo;
 import javafx.scene.shape.Ellipse;
-import javafx.scene.shape.StrokeType;
+import javafx.scene.shape.HLineTo;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
+import javafx.scene.shape.VLineTo;
 
 /** Creates JavaFX item for the Thermometer widget using
  *  {@link org.csstudio.javafx.rtplot.RTTank} as the rendering engine for
  *  the vertical fill column.
  *
- *  <p>This representation adds a numeric scale, tick format / precision, an
- *  optional second scale, and alarm-limit lines to the thermometer tube.
- *  An optional circular bulb drawn at the bottom of the tube visually
- *  distinguishes the widget from a plain Tank or ProgressBar; its radius is
- *  set by the {@code bulb_size} property (0 = no bulb, default 20 px).
+ *  <p>Visual design mirrors the original {@link ThermometerRepresentation}:
+ *  a single {@link Path} draws the entire glass tube + bulb outline (two
+ *  vertical walls with a rounded top cap and a large {@link ArcTo} sweeping
+ *  the bulb at the bottom).  A filled {@link Ellipse} drawn above the
+ *  RTTank canvas provides the liquid-colour bulb fill.  The RTTank canvas
+ *  sits below both, rendering the numeric scale, tick marks, alarm-limit
+ *  lines, and the fill bar (liquid level in the tube).
  *
- *  <p>Geometry: when bulb_size &gt; 0 the RTTank occupies
- *  {@code width × (height − bulb_size)} starting at the top, and the bulb
- *  is centred at {@code (width/2, height − bulb_size)}.  The bottom of the
- *  fill column reaches down to the bulb's centre, so the fill visually
- *  flows into the bulb, exactly matching the original hand-drawn look.
+ *  <p>The bulb is <em>always wider than the tube</em>: its radius is
+ *  {@code tube_half_width + bulb_size}, clamped to the available horizontal
+ *  widget space so it never overflows.  Set {@code bulb_size = 0} to disable
+ *  the bulb and revert to a plain scaled-bar appearance.
+ *
+ *  <p>The bar column's horizontal position is queried from
+ *  {@link org.csstudio.javafx.rtplot.RTTank#getBarColumnBounds()} so the
+ *  tube outline tracks the bar correctly regardless of scale-label width.
+ *  On the very first frame (before {@code computeLayout()} has run) the
+ *  bounds are (0,0,0,0); the code falls back to full-width and schedules a
+ *  second pass that corrects the position after the first render.
  *
  *  <p>Selected when the {@code thermometer_scale_mode} preference is
  *  {@code true}.  When the preference is {@code false} the stock
- *  {@link ThermometerRepresentation} is used instead, preserving the original
- *  hand-drawn thermometer look.
+ *  {@link ThermometerRepresentation} is used instead.
  *
- *  <p>Shared RTTank lifecycle (value / range updates, alarm limits) lives in
+ *  <p>Shared RTTank lifecycle (value / range / alarm-limit updates) lives in
  *  {@link RTScaledWidgetRepresentation}.
  *
- *  @author Amanda Carpenter
- *  @author Heredie Delvalle &mdash; CLS, RTTank-based rendering, scale support, bulb
+ *  @author Amanda Carpenter  (original ThermometerRepresentation shape design)
+ *  @author Heredie Delvalle &mdash; CLS  (RTTank-based rendering, scale, bulb)
  */
 @SuppressWarnings("nls")
 public class RTThermometerRepresentation extends RTScaledWidgetRepresentation<ThermometerWidget>
 {
-    /** Circular bulb drawn at the bottom of the tube; hidden when bulb_size == 0. */
-    private volatile Ellipse bulb;
+    /** Radius of tube corners at the top cap (px). */
+    private static final double CORNER_R = 3.0;
 
-    // ── JFX node ─────────────────────────────────────────────────────────────
+    // ── tube + bulb shape (drawn on top of RTTank canvas) ─────────────────────
+    //
+    //  Path traces (anti-clockwise from right side of tube at bulb junction):
+    //    tubeStart → up tubeRightWall → round topRightCorner → tubeCap →
+    //    round topLeftCorner → down tubeLeftWall → ArcTo bulb → (back to start)
+    //
+    private final MoveTo  tubeStart       = new MoveTo();
+    private final VLineTo tubeRightWall   = new VLineTo(CORNER_R);
+    private final LineTo  topRightCorner  = new LineTo();
+    private final HLineTo tubeCap         = new HLineTo();
+    private final LineTo  topLeftCorner   = new LineTo();
+    private final VLineTo tubeLeftWall    = new VLineTo();
+    private final ArcTo   bulbArc         = new ArcTo();
+    private final Path glassTube = new Path(
+            tubeStart, tubeRightWall, topRightCorner,
+            tubeCap, topLeftCorner, tubeLeftWall, bulbArc);
+
+    /** Filled ellipse at the bulb centre — the liquid inside the bulb. */
+    private final Ellipse bulbFill = new Ellipse();
+
+    // ── JFX node ──────────────────────────────────────────────────────────────
 
     @Override
     public Pane createJFXNode() throws Exception
     {
-        final Pane pane = super.createJFXNode();   // creates and stores this.tank
-        bulb = new Ellipse();
-        bulb.setManaged(false);                    // Pane uses absolute coordinates
-        bulb.setStrokeType(StrokeType.INSIDE);
-        bulb.setStrokeWidth(1);
-        bulb.setStroke(Color.DARKGRAY);
-        pane.getChildren().add(bulb);              // bulb drawn on top of tank
+        // super adds tank (RTTank canvas) as the first child of the Pane
+        final Pane pane = super.createJFXNode();
+
+        // bulbFill sits above the canvas so it is visible in the bulb area
+        // (below the tank bottom edge) and blends seamlessly with the fill bar.
+        bulbFill.setManaged(false);
+
+        // glassTube is stroke-only — it frames the fill bar and bulb without
+        // obscuring the scale labels rendered by RTTank.
+        glassTube.setManaged(false);
+        glassTube.setFill(null);
+        glassTube.setStroke(Color.DARKGRAY);
+        glassTube.setStrokeWidth(1.5);
+
+        // Large arc sweeps CCW (downward in screen coords) from left wall to
+        // right wall, tracing the bottom of the bulb circle.
+        bulbArc.setLargeArcFlag(true);
+        bulbArc.setSweepFlag(false);
+
+        // Z-order (bottom → top): tank canvas, bulb liquid fill, glass outline
+        pane.getChildren().addAll(bulbFill, glassTube);
         return pane;
     }
 
-    // ── orientation ──────────────────────────────────────────────────────────
+    // ── orientation ───────────────────────────────────────────────────────────
 
-    /** Thermometer is always vertical — no orientation toggle. */
     @Override
     protected boolean isHorizontal()
     {
-        return false;
+        return false;   // thermometer is always vertical
     }
 
-    // No configureTank() override: keep RTTank's default gradient fill,
-    // which gives the vertical tube a pleasant 3-D depth appearance.
-
-    // ── listeners ────────────────────────────────────────────────────────────
+    // ── listeners ─────────────────────────────────────────────────────────────
 
     @Override
     protected void registerLookListeners()
@@ -130,32 +175,7 @@ public class RTThermometerRepresentation extends RTScaledWidgetRepresentation<Th
         final Color fill = JFXUtil.convert(model_widget.propFillColor().getValue());
         final Color bg   = JFXUtil.convert(model_widget.propBackgroundColor().getValue());
 
-        // ── bulb ─────────────────────────────────────────────────────────────
-        final int r = model_widget.propBulbSize().getValue();
-        if (r > 0)
-        {
-            // Shrink the RTTank vertically so the tube ends where the bulb begins.
-            // The base class already called tank.setHeight(height); we override here.
-            tank.setHeight(Math.max(1.0, height - r));
-
-            // Position bulb: centred horizontally, bottom of widget.
-            bulb.setCenterX(width / 2.0);
-            bulb.setCenterY(height - r);
-            bulb.setRadiusX(r);
-            bulb.setRadiusY(r);
-
-            // Radial gradient replicates the original ThermometerRepresentation look.
-            bulb.setFill(new RadialGradient(0, 0, 0.3, 0.1, 0.4, true, CycleMethod.NO_CYCLE,
-                    new Stop(0, fill.interpolate(Color.WHITESMOKE, 0.8)),
-                    new Stop(1, fill)));
-            bulb.setVisible(true);
-        }
-        else
-        {
-            bulb.setVisible(false);
-        }
-
-        // ── RTTank appearance ─────────────────────────────────────────────────
+        // ── Standard RTTank settings ─────────────────────────────────────────
         tank.setFont(JFXUtil.convert(model_widget.propFont().getValue()));
         tank.setFillColor(fill);
         tank.setBackground(bg);
@@ -170,5 +190,84 @@ public class RTThermometerRepresentation extends RTScaledWidgetRepresentation<Th
         tank.setLabelFormat(model_widget.propFormat().getValue(),
                             model_widget.propPrecision().getValue());
         tank.setInnerPadding(model_widget.propInnerPadding().getValue());
+
+        // ── Bulb + glass tube overlay ────────────────────────────────────────
+        final int extraR = model_widget.propBulbSize().getValue();
+        if (extraR > 0)
+        {
+            // Query bar column position from last render pass.
+            // Returns (0,0,0,0) before the tank has rendered for the first time.
+            final Rectangle barBounds = tank.getBarColumnBounds();
+            final double bx, bw;
+            if (barBounds.width > 0)
+            {
+                bx = barBounds.x;
+                bw = barBounds.width;
+            }
+            else
+            {
+                // First-frame fallback: treat whole widget as bar column.
+                // Re-trigger once RTTank has populated its layout bounds.
+                bx = 0.0;
+                bw = width;
+                Platform.runLater(() -> { dirty_look.mark(); toolkit.scheduleUpdate(this); });
+            }
+
+            final double cx    = bx + bw / 2.0;      // bar column centre X
+            final double tw    = bw / 2.0;             // tube half-width
+
+            // Bulb radius = tube half-width + user-configured extra.
+            // Clamped so the bulb never overflows the widget bounds.
+            final double br    = Math.min(tw + extraR, Math.min(cx, width - cx));
+
+            // Centre of bulb (br pixels up from widget bottom).
+            final double bulbCY = Math.max(br, height - br);
+
+            // Left / right inner edges of the glass tube.
+            final double x1 = cx - tw;
+            final double x2 = cx + tw;
+
+            // Clip RTTank to the tube area only — the bulb extends below.
+            tank.setHeight(Math.max(1.0, bulbCY));
+
+            // ── Bulb fill (liquid colour with radial highlight) ───────────────
+            // Drawn above the RTTank canvas so it is always visible in the
+            // bulb area; blend is seamless because the fill colour matches.
+            bulbFill.setCenterX(cx);
+            bulbFill.setCenterY(bulbCY);
+            bulbFill.setRadiusX(br - 1.5);
+            bulbFill.setRadiusY(br - 1.5);
+            bulbFill.setFill(new RadialGradient(
+                    0, 0, 0.3, 0.1, 0.4, true, CycleMethod.NO_CYCLE,
+                    new Stop(0, fill.interpolate(Color.WHITESMOKE, 0.7)),
+                    new Stop(1, fill)));
+            bulbFill.setVisible(true);
+
+            // ── Glass tube Path (stroke-only) ─────────────────────────────────
+            // Traces from the right tube wall at the bulb junction, up the right
+            // wall, across the rounded top cap, down the left wall, then sweeps
+            // the bulb arc back to the start — identical topology to the original
+            // ThermometerRepresentation border Path.
+            tubeStart.setX(x2);
+            tubeStart.setY(bulbCY);
+            tubeRightWall.setY(CORNER_R);        // up right wall
+            topRightCorner.setX(x2 - CORNER_R);
+            topRightCorner.setY(0.0);
+            tubeCap.setX(x1 + CORNER_R);         // top horizontal cap
+            topLeftCorner.setX(x1);
+            topLeftCorner.setY(CORNER_R);
+            tubeLeftWall.setY(bulbCY);           // down left wall to bulb junction
+            // Arc from (x1, bulbCY) sweeping downward to (x2, bulbCY)
+            bulbArc.setX(x2);
+            bulbArc.setY(bulbCY);
+            bulbArc.setRadiusX(br);
+            bulbArc.setRadiusY(br);
+            glassTube.setVisible(true);
+        }
+        else
+        {
+            bulbFill.setVisible(false);
+            glassTube.setVisible(false);
+        }
     }
 }

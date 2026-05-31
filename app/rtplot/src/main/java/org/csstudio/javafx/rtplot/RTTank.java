@@ -514,6 +514,25 @@ public class RTTank extends Canvas
         requestUpdate();
     }
 
+    /** Return the bounds of the bar column within the canvas coordinate space.
+     *  The bar column is the actual filled rectangle — it excludes any scale
+     *  label areas on the left and/or right side.
+     *
+     *  <p>This is computed during {@link #computeLayout} and is therefore
+     *  available only after the first render pass.  Before the first render
+     *  the rectangle is {@code (0,0,0,0)}.
+     *
+     *  <p>Callers that need to overlay a decoration centred on the bar column
+     *  (e.g. a thermometer bulb) should use this to avoid misalignment when a
+     *  visible scale shifts the bar column away from the canvas edge.
+     *
+     *  @return bounds of the bar column in canvas pixels (x, y, width, height)
+     */
+    public Rectangle getBarColumnBounds()
+    {
+        return plot_area.getBounds();
+    }
+
     /** Map a value to a Y pixel within the plot bounds (low value at bottom).
      *  Returns -1 when the mapping is undefined (e.g. log scale with non-positive inputs).
      */
@@ -596,7 +615,11 @@ public class RTTank extends Canvas
             ends[1] = Math.max(ends[1], r_ends[1]);
         }
 
-        // Inset: half border-width rounded up, plus inner_padding on all sides.
+        // Inset = ceil(border_width/2) keeps the outer stroke edge inside the canvas.
+        // On sides with a scale the label area provides ample margin so inset=0.
+        // When there is no border, inset=1 is the original clip guard.
+        // inner_padding is added on top of all four sides regardless of scale presence;
+        // it is 0 for the standard tank and > 0 for the progress-bar track mode.
         final int half_bw_ceil = (border_width + 1) / 2;
         final int ip = inner_padding;
         final int inset_left   = (left_width  == 0) ? Math.max(1, half_bw_ceil) + ip : ip;
@@ -688,35 +711,30 @@ public class RTTank extends Canvas
             gc.setStroke(new BasicStroke(1f));
         }
 
-        drawAlarmLimits(gc, plot_bounds, normal, min, max);
+        // Draw alarm / warning limit lines over the tank body
+        final double lim_lolo = limit_lolo;
+        final double lim_lo   = limit_lo;
+        final double lim_hi   = limit_hi;
+        final double lim_hihi = limit_hihi;
+        if (normal && (!Double.isNaN(lim_lolo) || !Double.isNaN(lim_lo) ||
+                        !Double.isNaN(lim_hi)   || !Double.isNaN(lim_hihi)))
+        {
+            if (limits_from_pv)
+                gc.setStroke(new BasicStroke(2f));
+            else
+                gc.setStroke(new BasicStroke(2f, BasicStroke.CAP_BUTT,
+                        BasicStroke.JOIN_MITER, 10f, new float[]{6f, 4f}, 0f));
+            drawLimitLineAt(gc, plot_bounds, min, max, lim_lolo, limit_major_color);
+            drawLimitLineAt(gc, plot_bounds, min, max, lim_lo,   limit_minor_color);
+            drawLimitLineAt(gc, plot_bounds, min, max, lim_hi,   limit_minor_color);
+            drawLimitLineAt(gc, plot_bounds, min, max, lim_hihi, limit_major_color);
+            gc.setStroke(new BasicStroke(1f));
+        }
 
         gc.dispose();
 
         // Convert to JFX
         return SwingFXUtils.toFXImage(image, null);
-    }
-
-    /** Draw alarm/warning limit lines over the tank body, if any limits are set */
-    private void drawAlarmLimits(final Graphics2D gc, final Rectangle plot_bounds,
-                                 final boolean normal, final double min, final double max)
-    {
-        final double lim_lolo = limit_lolo;
-        final double lim_lo   = limit_lo;
-        final double lim_hi   = limit_hi;
-        final double lim_hihi = limit_hihi;
-        if (!normal || (Double.isNaN(lim_lolo) && Double.isNaN(lim_lo) &&
-                        Double.isNaN(lim_hi)   && Double.isNaN(lim_hihi)))
-            return;
-        if (limits_from_pv)
-            gc.setStroke(new BasicStroke(2f));
-        else
-            gc.setStroke(new BasicStroke(2f, BasicStroke.CAP_BUTT,
-                    BasicStroke.JOIN_MITER, 10f, new float[]{6f, 4f}, 0f));
-        drawLimitLineAt(gc, plot_bounds, min, max, lim_lolo, limit_major_color);
-        drawLimitLineAt(gc, plot_bounds, min, max, lim_lo,   limit_minor_color);
-        drawLimitLineAt(gc, plot_bounds, min, max, lim_hi,   limit_minor_color);
-        drawLimitLineAt(gc, plot_bounds, min, max, lim_hihi, limit_major_color);
-        gc.setStroke(new BasicStroke(1f));
     }
 
     /** Request a complete redraw of the plot */
