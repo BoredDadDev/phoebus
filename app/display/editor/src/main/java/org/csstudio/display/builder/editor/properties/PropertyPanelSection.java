@@ -78,6 +78,8 @@ import java.util.function.Function;
 import java.util.logging.Level;
 
 import static org.csstudio.display.builder.editor.Plugin.logger;
+import org.csstudio.display.builder.model.widgets.ThermometerWidget;
+import org.csstudio.display.builder.representation.Preferences;
 
 /**
  * Section of Property panel
@@ -161,6 +163,12 @@ public class PropertyPanelSection extends GridPane {
             // 'class' is not used for the class definition itself,
             // it's only shown for displays where classes are then applied
             if (property instanceof WidgetClassProperty && class_mode)
+                continue;
+
+            // Hide scale-mode-only properties when the legacy thermometer renderer is active.
+            if (!Preferences.thermometer_scale_mode
+                    && property.getWidget() instanceof ThermometerWidget
+                    && ThermometerWidget.SCALE_MODE_PROPS.contains(property.getName()))
                 continue;
 
             // Start of new category that needs to be shown?

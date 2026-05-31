@@ -55,6 +55,7 @@ import org.csstudio.display.builder.model.widgets.plots.DataBrowserWidget;
 import org.csstudio.display.builder.model.widgets.plots.ImageWidget;
 import org.csstudio.display.builder.model.widgets.plots.StripchartWidget;
 import org.csstudio.display.builder.model.widgets.plots.XYPlotWidget;
+import org.csstudio.display.builder.representation.Preferences;
 import org.csstudio.display.builder.representation.WidgetRepresentation;
 import org.csstudio.display.builder.representation.WidgetRepresentationFactory;
 import org.csstudio.display.builder.representation.javafx.widgets.plots.DataBrowserRepresentation;
@@ -121,7 +122,9 @@ public class BaseWidgetRepresentations implements WidgetRepresentationsService
             entry(TextEntryWidget.WIDGET_DESCRIPTOR,       () -> (WidgetRepresentation) new TextEntryRepresentation()),
             entry(TextSymbolWidget.WIDGET_DESCRIPTOR,      () -> (WidgetRepresentation) new TextSymbolRepresentation()),
             entry(TextUpdateWidget.WIDGET_DESCRIPTOR,      () -> (WidgetRepresentation) new TextUpdateRepresentation()),
-            entry(ThermometerWidget.WIDGET_DESCRIPTOR,     () -> (WidgetRepresentation) new ThermometerRepresentation()),
+            entry(ThermometerWidget.WIDGET_DESCRIPTOR,     () -> (WidgetRepresentation) (Preferences.thermometer_scale_mode
+                    ? new RTThermometerRepresentation()
+                    : new ThermometerRepresentation())),
             entry(Viewer3dWidget.WIDGET_DESCRIPTOR,        () -> (WidgetRepresentation) new Viewer3dRepresentation()),
             entry(WebBrowserWidget.WIDGET_DESCRIPTOR,      () -> (WidgetRepresentation) new WebBrowserRepresentation()),
             entry(XYPlotWidget.WIDGET_DESCRIPTOR,          () -> (WidgetRepresentation) new XYPlotRepresentation()),

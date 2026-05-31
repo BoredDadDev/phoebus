@@ -22,6 +22,13 @@ public class Preferences
                       update_accumulation_time, update_delay, plot_update_delay, image_update_delay,
                       tooltip_length, embedded_timeout;
 
+    /** When {@code true}, the Thermometer widget is rendered by {@link RTTank}
+     *  (the same engine as Tank and ProgressBar in scale mode), gaining a
+     *  numeric scale, tick marks and alarm-limit lines.  The preference is
+     *  read once at start-up; changing it requires a restart.
+     *  Default is {@code false} (use the legacy JavaFX-based renderer). */
+    @Preference public static boolean thermometer_scale_mode;
+
     static
     {
     	AnnotatedPreferences.initialize(Preferences.class, "/display_representation_preferences.properties");
