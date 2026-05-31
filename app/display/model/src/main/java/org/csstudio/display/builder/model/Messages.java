@@ -182,6 +182,7 @@ public class Messages
                          WidgetProperties_BarBackgroundColor,
                          WidgetProperties_BarColor,
                          WidgetProperties_Bit,
+                         WidgetProperties_BulbSize,
                          WidgetProperties_BorderAlarmSensitive,
                          WidgetProperties_BorderColor,
                          WidgetProperties_BorderWidth,

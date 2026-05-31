@@ -62,6 +62,7 @@ public class ThermometerWidget extends ScaledPVWidget
         "scale_visible", "show_minor_ticks", "show_scale_labels",
         "opposite_scale_visible", "perpendicular_tick_labels",
         "inner_padding", "border_width",
+        "bulb_size",
         "alarm_limits_from_pv", "show_alarm_limits",
         "level_lolo", "level_low", "level_high", "level_hihi",
         "minor_alarm_color", "major_alarm_color");
@@ -70,6 +71,13 @@ public class ThermometerWidget extends ScaledPVWidget
     public static final WidgetPropertyDescriptor<Integer> propInnerPadding =
         newIntegerPropertyDescriptor(WidgetPropertyCategory.DISPLAY, "inner_padding",
                                      Messages.WidgetProperties_InnerPadding, 0, 20);
+
+    /** 'bulb_size' — radius in pixels of the circular bulb drawn at the bottom of the
+     *  thermometer tube in RTTank scale mode.  Set to 0 to suppress the bulb entirely.
+     *  Default 20 matches the auto-size of the stock thermometer for a 40 px wide widget. */
+    public static final WidgetPropertyDescriptor<Integer> propBulbSize =
+        newIntegerPropertyDescriptor(WidgetPropertyCategory.DISPLAY, "bulb_size",
+                                     Messages.WidgetProperties_BulbSize, 0, 50);
 
     /** Widget descriptor */
     public static final WidgetDescriptor WIDGET_DESCRIPTOR = new WidgetDescriptor("thermometer",
@@ -97,6 +105,7 @@ public class ThermometerWidget extends ScaledPVWidget
     private volatile WidgetProperty<Boolean>     perpendicular_tick_labels;
     private volatile WidgetProperty<Integer>     border_width_prop;
     private volatile WidgetProperty<Integer>     inner_padding_prop;
+    private volatile WidgetProperty<Integer>     bulb_size_prop;
 
     /** Constructor */
     public ThermometerWidget()
@@ -111,13 +120,14 @@ public class ThermometerWidget extends ScaledPVWidget
         properties.add(fill_color               = propFillColor.createProperty(this, new WidgetColor(60, 255, 60)));
         properties.add(background_color         = propBackgroundColor.createProperty(this, new WidgetColor(250, 250, 250)));
         properties.add(log_scale                = propLogscale.createProperty(this, false));
-        properties.add(scale_visible            = propScaleVisible.createProperty(this, false));
+        properties.add(scale_visible            = propScaleVisible.createProperty(this, true));
         properties.add(show_minor_ticks         = propShowMinorTicks.createProperty(this, true));
         properties.add(show_scale_labels        = propShowScaleLabels.createProperty(this, true));
         properties.add(opposite_scale_visible   = propOppositeScaleVisible.createProperty(this, false));
-        properties.add(perpendicular_tick_labels = propPerpendicularTickLabels.createProperty(this, false));
+        properties.add(perpendicular_tick_labels = propPerpendicularTickLabels.createProperty(this, true));
         properties.add(border_width_prop        = propBorderWidth.createProperty(this, 0));
         properties.add(inner_padding_prop       = propInnerPadding.createProperty(this, 3));
+        properties.add(bulb_size_prop           = propBulbSize.createProperty(this, 20));
         properties.add(font                     = propFont.createProperty(this, WidgetFontService.get(NamedWidgetFonts.DEFAULT)));
     }
 
@@ -153,4 +163,7 @@ public class ThermometerWidget extends ScaledPVWidget
 
     /** @return 'inner_padding' property */
     public WidgetProperty<Integer> propInnerPadding()                 { return inner_padding_prop; }
+
+    /** @return 'bulb_size' property — radius in pixels, 0 = no bulb */
+    public WidgetProperty<Integer> propBulbSize()                     { return bulb_size_prop; }
 }
